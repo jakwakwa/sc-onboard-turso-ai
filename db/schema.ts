@@ -1,5 +1,5 @@
-import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
+import { text, integer, sqliteTable } from "drizzle-orm/sqlite-core";
 
 // ============================================
 // Core Onboarding Tables
@@ -65,9 +65,10 @@ export const workflows = sqliteTable("workflows", {
 	})
 		.notNull()
 		.default("pending"),
-	currentAgent: text("current_agent"), // e.g., "zapier_doc_agent_v1"
+	currentAgent: text("current_agent"), // e.g., "xt_doc_agent_v1"
 	agentSentAt: integer("agent_sent_at", { mode: "timestamp" }),
 	metadata: text("metadata"), // JSON string for flexible data
+	errorDetails: text("error_details"), // JSON string for error context
 	startedAt: integer("started_at", { mode: "timestamp" })
 		.notNull()
 		.$defaultFn(() => new Date()),
@@ -96,24 +97,24 @@ export const workflowEvents = sqliteTable("workflow_events", {
 	toStage: integer("to_stage"),
 	payload: text("payload"), // JSON string
 	actorId: text("actor_id"), // Clerk user ID or agent ID
-	actorType: text("actor_type", { enum: ["user", "agent", "system"] })
+	actorType: text("actor_type", { enum: ["user", "agent", "platform"] })
 		.notNull()
-		.default("system"),
+		.default("platform"),
 	timestamp: integer("timestamp", { mode: "timestamp" })
 		.notNull()
 		.$defaultFn(() => new Date()),
 });
 
 /**
- * Zapier Callbacks - Agent callback records
+ * external Callbacks - Agent callback records
  */
-export const zapierCallbacks = sqliteTable("zapier_callbacks", {
+export const agentCallbacks = sqliteTable("xt_callbacks", {
 	id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
 	workflowId: integer("workflow_id")
 		.notNull()
 		.references(() => workflows.id),
 	eventId: text("event_id").notNull(), // From incoming webhook
-	agentId: text("agent_id").notNull(), // e.g., "zapier_risk_agent_v2"
+	agentId: text("agent_id").notNull(), // e.g., "xt_risk_agent_v2"
 	status: text("status", {
 		enum: ["received", "validated", "processed", "rejected", "error"],
 	})
@@ -133,11 +134,11 @@ export const zapierCallbacks = sqliteTable("zapier_callbacks", {
 });
 
 /**
- * Agent Registry - Track available Zapier agents
+ * Agent Registry - Track available external agents
  */
 export const agents = sqliteTable("agents", {
 	id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-	agentId: text("agent_id").notNull().unique(), // e.g., "zapier_risk_agent_v2"
+	agentId: text("agent_id").notNull().unique(), // e.g., "xt_risk_agent_v2"
 	name: text("name").notNull(),
 	description: text("description"),
 	webhookUrl: text("webhook_url"),
@@ -165,6 +166,36 @@ export const agents = sqliteTable("agents", {
 // Relations
 // ============================================
 
+/**
+ * Quotes table - Generated fee structures
+ */
+export const quotes = sqliteTable("quotes", {
+	id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+	workflowId: integer("workflow_id")
+		.notNull()
+		.references(() => workflows.id),
+	amount: integer("amount").notNull(), // Cents
+	baseFeePercent: integer("base_fee_percent").notNull(), // Basis points (e.g. 150 = 1.5%)
+	adjustedFeePercent: integer("adjusted_fee_percent"), // Basis points
+	rationale: text("rationale"), // AI reasoning for the fee
+	status: text("status", {
+		enum: ["draft", "pending_approval", "approved", "rejected"],
+	})
+		.notNull()
+		.default("draft"),
+	generatedBy: text("generated_by").notNull().default("platform"), // 'system' or 'gemini'
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.$defaultFn(() => new Date()),
+	updatedAt: integer("updated_at", { mode: "timestamp" })
+		.notNull()
+		.$defaultFn(() => new Date()),
+});
+
+// ============================================
+// Relations
+// ============================================
+
 export const leadsRelations = relations(leads, ({ many }) => ({
 	workflows: many(workflows),
 }));
@@ -174,8 +205,16 @@ export const workflowsRelations = relations(workflows, ({ one, many }) => ({
 		fields: [workflows.leadId],
 		references: [leads.id],
 	}),
+	quotes: many(quotes),
 	events: many(workflowEvents),
-	callbacks: many(zapierCallbacks),
+	callbacks: many(agentCallbacks),
+}));
+
+export const quotesRelations = relations(quotes, ({ one }) => ({
+	workflow: one(workflows, {
+		fields: [quotes.workflowId],
+		references: [workflows.id],
+	}),
 }));
 
 export const workflowEventsRelations = relations(workflowEvents, ({ one }) => ({
@@ -185,15 +224,12 @@ export const workflowEventsRelations = relations(workflowEvents, ({ one }) => ({
 	}),
 }));
 
-export const zapierCallbacksRelations = relations(
-	zapierCallbacks,
-	({ one }) => ({
-		workflow: one(workflows, {
-			fields: [zapierCallbacks.workflowId],
-			references: [workflows.id],
-		}),
+export const agentCallbacksRelations = relations(agentCallbacks, ({ one }) => ({
+	workflow: one(workflows, {
+		fields: [agentCallbacks.workflowId],
+		references: [workflows.id],
 	}),
-);
+}));
 
 // ============================================
 // Legacy table (kept for compatibility)
@@ -204,3 +240,30 @@ export const todos = sqliteTable("todos", {
 	description: text("description").notNull(),
 	completed: integer("completed", { mode: "boolean" }).notNull().default(false),
 });
+
+/**
+ * Notifications table - Control Tower UI alerts
+ */
+export const notifications = sqliteTable("notifications", {
+	id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+	workflowId: integer("workflow_id").references(() => workflows.id),
+	leadId: integer("lead_id").references(() => leads.id),
+	type: text("type", {
+		enum: ["awaiting", "completed", "failed", "timeout", "paused", "error"],
+	}).notNull(),
+	title: text("title").notNull(),
+	message: text("message").notNull(),
+	actionable: integer("actionable", { mode: "boolean" }).default(true),
+	read: integer("read", { mode: "boolean" }).notNull().default(false),
+	errorDetails: text("error_details"), // JSON with error context
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.$defaultFn(() => new Date()),
+});
+
+// Update workflows table to include error_details
+// Note: This is an additive change to the existing schema definition
+// We need to modify the existing workflows table definition in line 45-75
+// but since I can't look back at the file content in this tool call,
+// I will rely on the mulit_replace or just append the notifications table here
+// and use a separate call to update the workflows table.

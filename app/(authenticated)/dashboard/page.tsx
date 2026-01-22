@@ -9,159 +9,202 @@ import {
 	DashboardGrid,
 	DashboardSection,
 	StatsCard,
-	WorkflowTable,
 	ActivityFeed,
 } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { getDatabaseClient } from "@/app/utils";
+import { workflows, leads, workflowEvents, notifications } from "@/db/schema";
+import { desc, eq, count } from "drizzle-orm";
+import {
+	DynamicWorkflowTable as WorkflowTable,
+	DynamicWebhookTester as WebhookTester,
+} from "@/components/dashboard/dynamic-components";
 
-// Demo data - will be replaced with real data from DB
-const mockStats = {
-	activeWorkflows: 12,
-	pendingApprovals: 4,
-	leadsToday: 8,
-	completionRate: 94,
-};
+export default async function DashboardPage() {
+	const db = getDatabaseClient();
+	let activeWorkflows: any[] = [];
+	let recentActivity: any[] = [];
+	let workflowsCount = 0;
+	let leadsCount = 0;
 
-const mockWorkflows = [
-	{
-		id: 1,
-		clientName: "TechCorp SA",
-		stage: 3 as const,
-		stageName: "verification",
-		status: "awaiting_human" as const,
-		currentAgent: "zapier_risk_agent_v2",
-		startedAt: new Date(Date.now() - 3600000 * 2),
-		payload: {
-			riskScore: 85,
-			anomalies: ["Blurred Transaction Line", "Sanctions Partial Match"],
-			documentLinks: ["https://storage.googleapis.com/..."],
-		},
-	},
-	{
-		id: 2,
-		clientName: "Financial Solutions Ltd",
-		stage: 2 as const,
-		stageName: "dynamic_quotation",
-		status: "in_progress" as const,
-		currentAgent: "zapier_doc_agent_v1",
-		startedAt: new Date(Date.now() - 3600000 * 5),
-		payload: { quoteId: "Q-2024-001", amount: 250000 },
-	},
-	{
-		id: 3,
-		clientName: "Mining Resources PTY",
-		stage: 4 as const,
-		stageName: "integration",
-		status: "completed" as const,
-		currentAgent: undefined,
-		startedAt: new Date(Date.now() - 86400000),
-		payload: { syncedAt: new Date().toISOString(), v24Status: "success" },
-	},
-	{
-		id: 4,
-		clientName: "Retail Holdings",
-		stage: 1 as const,
-		stageName: "lead_capture",
-		status: "pending" as const,
-		currentAgent: "zapier_doc_agent_v1",
-		startedAt: new Date(Date.now() - 1800000),
-		payload: { formSent: true, signatureRequested: true },
-	},
-];
+	if (db) {
+		try {
+			// Fetch Workflows with Lead data
+			const result = await db
+				.select({
+					id: workflows.id,
+					leadId: workflows.leadId,
+					stage: workflows.stage,
+					stageName: workflows.stageName,
+					status: workflows.status,
+					currentAgent: workflows.currentAgent,
+					startedAt: workflows.startedAt,
+					metadata: workflows.metadata,
+					clientName: leads.companyName,
+				})
+				.from(workflows)
+				.leftJoin(leads, eq(workflows.leadId, leads.id))
+				.orderBy(desc(workflows.startedAt))
+				.limit(10);
 
-const mockActivity = [
-	{
-		id: 1,
-		workflowId: 1,
-		clientName: "TechCorp SA",
-		eventType: "agent_dispatch" as const,
-		description: "Risk verification task dispatched to Zapier agent",
-		timestamp: new Date(Date.now() - 1800000),
-		actorType: "system" as const,
-		actorId: "zapier_risk_agent_v2",
-	},
-	{
-		id: 2,
-		workflowId: 2,
-		clientName: "Financial Solutions Ltd",
-		eventType: "stage_change" as const,
-		description: "Progressed to Dynamic Quotation stage",
-		timestamp: new Date(Date.now() - 3600000),
-		actorType: "system" as const,
-	},
-	{
-		id: 3,
-		workflowId: 3,
-		clientName: "Mining Resources PTY",
-		eventType: "agent_callback" as const,
-		description: "V24 sync completed successfully",
-		timestamp: new Date(Date.now() - 7200000),
-		actorType: "agent" as const,
-		actorId: "zapier_sync_agent_v1",
-	},
-	{
-		id: 4,
-		workflowId: 1,
-		clientName: "TechCorp SA",
-		eventType: "human_override" as const,
-		description: "Risk score manually adjusted by manager",
-		timestamp: new Date(Date.now() - 14400000),
-		actorType: "user" as const,
-		actorId: "risk_manager@company.co.za",
-	},
-];
+			activeWorkflows = result.map((w) => ({
+				...w,
+				// Parse metadata if it exists, otherwise use empty object
+				payload: w.metadata ? JSON.parse(w.metadata) : {},
+			}));
 
-export default function DashboardPage() {
+			// Fetch Recent Activity
+			const activityResult = await db
+				.select({
+					id: workflowEvents.id,
+					workflowId: workflowEvents.workflowId,
+					eventType: workflowEvents.eventType,
+					timestamp: workflowEvents.timestamp,
+					actorType: workflowEvents.actorType,
+					actorId: workflowEvents.actorId,
+					clientName: leads.companyName,
+					payload: workflowEvents.payload,
+				})
+				.from(workflowEvents)
+				.innerJoin(workflows, eq(workflowEvents.workflowId, workflows.id))
+				.innerJoin(leads, eq(workflows.leadId, leads.id))
+				.orderBy(desc(workflowEvents.timestamp))
+				.limit(10);
+
+			recentActivity = activityResult.map((event) => {
+				let description = "Event occurred";
+				const payload = event.payload ? JSON.parse(event.payload) : {};
+
+				switch (event.eventType) {
+					case "stage_change":
+						description = `Workflow advanced to ${payload.toStage || "next stage"}`;
+						break;
+					case "agent_dispatch":
+						description = `Agent ${event.actorId || "platform"} dispatched`;
+						break;
+					case "agent_callback":
+						description = `Agent response received`;
+						break;
+					case "human_override":
+						description = `Manual override applied`;
+						break;
+					case "error":
+						description = `Error: ${payload.error || "Workflow error detected"}`;
+						break;
+					case "timeout":
+						description = `Workflow stage timed out`;
+						break;
+				}
+
+				return {
+					...event,
+					description,
+				};
+			});
+
+			const wfCountResult = await db.select({ count: count() }).from(workflows);
+			workflowsCount = wfCountResult[0]?.count || 0;
+
+			const leadsCountResult = await db.select({ count: count() }).from(leads);
+			leadsCount = leadsCountResult[0]?.count || 0;
+		} catch (error) {
+			console.error("Failed to fetch dashboard data:", error);
+		}
+	}
+
+	// Fetch notifications
+	let workflowNotifications: any[] = [];
+	if (db) {
+		try {
+			// Change import of notifications at top first!
+			// Dynamic import or separate fetch call not possible inside ReplaceFileContent easily without adding imports
+			// I will fetch notifications here assuming update of imports below
+
+			const notificationsResult = await db
+				.select({
+					id: notifications.id,
+					workflowId: notifications.workflowId,
+					type: notifications.type,
+					message: notifications.message,
+					read: notifications.read,
+					actionable: notifications.actionable,
+					createdAt: notifications.createdAt,
+					clientName: leads.companyName,
+				})
+				.from(notifications)
+				.leftJoin(leads, eq(notifications.leadId, leads.id))
+				.orderBy(desc(notifications.createdAt))
+				.limit(20);
+
+			workflowNotifications = notificationsResult.map((n) => ({
+				id: n.id.toString(),
+				workflowId: n.workflowId,
+				clientName: n.clientName || "Unknown",
+				type: n.type as any,
+				message: n.message,
+				timestamp: n.createdAt,
+				read: n.read,
+				actionable: n.actionable,
+			}));
+		} catch (error) {
+			console.error("Failed to fetch notifications:", error);
+		}
+	}
+
 	return (
 		<DashboardLayout
 			title="Control Tower"
 			description="Monitor your onboarding workflows in real-time"
 			actions={
-				<Link href="/dashboard/leads/new">
-					<Button className="gap-2 bg-gradient-to-r from-stone-500 to-stone-500 hover:from-stone-600 hover:to-stone-600">
-						<RiUserAddLine className="h-4 w-4" />
-						New Lead
-					</Button>
-				</Link>
+				<div className="flex items-center gap-4">
+					{process.env.TEST_HOOK === "1" && <WebhookTester />}
+					<Link href="/dashboard/leads/new">
+						<Button className="gap-2 bg-gradient-to-r from-stone-500 to-stone-500 hover:from-stone-600 hover:to-stone-600">
+							<RiUserAddLine className="h-4 w-4" />
+							New Lead
+						</Button>
+					</Link>
+				</div>
 			}
+			notifications={workflowNotifications}
 		>
 			{/* Stats Grid */}
 			<DashboardGrid columns={4} className="mb-8">
 				<StatsCard
 					title="Active Workflows"
-					value={mockStats.activeWorkflows}
-					change={{ value: 12, trend: "up" }}
+					value={workflowsCount}
+					change={{ value: 0, trend: "neutral" }}
 					icon={RiFlowChart}
 					iconColor="amber"
 				/>
 				<StatsCard
 					title="Pending Approvals"
-					value={mockStats.pendingApprovals}
-					change={{ value: 2, trend: "down" }}
+					value={0} // TODO: Count 'awaiting_human' status
+					change={{ value: 0, trend: "neutral" }}
 					icon={RiTimeLine}
 					iconColor="purple"
 				/>
 				<StatsCard
-					title="Leads Today"
-					value={mockStats.leadsToday}
-					change={{ value: 25, trend: "up" }}
+					title="Total Leads"
+					value={leadsCount}
+					change={{ value: 0, trend: "neutral" }}
 					icon={RiUserAddLine}
 					iconColor="blue"
 				/>
 				<StatsCard
 					title="Completion Rate"
-					value={`${mockStats.completionRate}%`}
-					change={{ value: 3, trend: "up" }}
+					value="-"
+					change={{ value: 0, trend: "neutral" }}
 					icon={RiCheckDoubleLine}
 					iconColor="green"
 				/>
 			</DashboardGrid>
 
 			{/* Main content grid */}
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+			<div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
 				{/* Workflows Table - spans 2 columns */}
-				<div className="lg:col-span-2">
+				<div className="lg:col-span-3">
 					<DashboardSection
 						title="Active Workflows"
 						description="Real-time status of onboarding workflows"
@@ -173,15 +216,15 @@ export default function DashboardPage() {
 							</Link>
 						}
 					>
-						<WorkflowTable workflows={mockWorkflows} />
+						<WorkflowTable workflows={activeWorkflows} />
 					</DashboardSection>
 				</div>
 
 				{/* Activity Feed */}
 				<div className="lg:col-span-1">
 					<DashboardSection title="Recent Activity">
-						<div className="rounded-2xl border border-sidebar-border bg-card/50 p-4">
-							<ActivityFeed events={mockActivity} maxItems={5} />
+						<div className="rounded-2xl border border-sidebar-border bg-card/50 p-4 shadow-[0_10px_20px_1px_rgba(0,0,0,0.1)]">
+							<ActivityFeed events={recentActivity} maxItems={5} />
 						</div>
 					</DashboardSection>
 				</div>

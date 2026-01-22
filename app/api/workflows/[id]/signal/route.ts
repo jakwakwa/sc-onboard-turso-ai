@@ -1,20 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTemporalClient } from "@/lib/temporal";
+import { inngest } from "@/inngest";
 import { z } from "zod";
 
-// Valid signal names we accept from UI
-const signalSchema = z.object({
+// Schema for internal UI signals
+const uiSignalSchema = z.object({
 	signalName: z.enum(["qualityGatePassed", "humanOverride"]),
 	payload: z.any(),
 });
 
+// Schema for Platform / Agent Callbacks
+const agentCallbackSchema = z.object({
+	workflowId: z.union([z.string(), z.number()]).optional(),
+	agentId: z.string().optional(),
+	status: z.string().optional(),
+	decision: z.object({
+		outcome: z.string(),
+		manualOverrides: z.any().optional(),
+		reason: z.string().optional(),
+	}),
+	audit: z
+		.object({
+			humanActor: z.string().optional(),
+			timestamp: z.string().optional(),
+		})
+		.optional(),
+});
+
 /**
  * POST /api/workflows/[id]/signal
- * Signal a running workflow
+ * Signal a running workflow via Inngest events. Supports:
+ * 1. Internal UI Signals ({ signalName, payload })
+ * 2. External Agent Webhooks (Direct JSON payload)
  */
 export async function POST(
 	request: NextRequest,
-	{ params }: { params: Promise<{ id: string }> }, // Correct Next.js 15 params typing
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	try {
 		const { id } = await params;
@@ -28,35 +48,70 @@ export async function POST(
 		}
 
 		const body = await request.json();
-		const validation = signalSchema.safeParse(body);
 
-		if (!validation.success) {
-			return NextResponse.json(
-				{ error: "Invalid signal data", details: validation.error },
-				{ status: 400 },
+		// 1. Try parsing as UI Signal
+		const uiValidation = uiSignalSchema.safeParse(body);
+		if (uiValidation.success) {
+			const { signalName, payload } = uiValidation.data;
+
+			if (signalName === "qualityGatePassed") {
+				await inngest.send({
+					name: "onboarding/quality-gate-passed",
+					data: {
+						workflowId,
+						approverId: "human_reviewer", // Defaulting to generic human reviewer as specific ID isn't passed in UI signal yet
+						timestamp: new Date().toISOString(),
+					},
+				});
+			}
+
+			console.log(
+				`[API] Sent Inngest event for Workflow ${workflowId}: ${signalName}`,
 			);
+			return NextResponse.json({ success: true, signal: signalName });
 		}
 
-		const { signalName, payload } = validation.data;
-		const temporalWorkflowId = `onboarding-${workflowId}`;
+		// 2. Try parsing as Agent Callback
+		const agentValidation = agentCallbackSchema.safeParse(body);
+		if (agentValidation.success) {
+			const agentData = agentValidation.data;
 
-		const client = await getTemporalClient();
-		const handle = client.workflow.getHandle(temporalWorkflowId);
+			await inngest.send({
+				name: "onboarding/agent-callback",
+				data: {
+					workflowId,
+					decision: {
+						agentId: agentData.agentId || "external",
+						outcome: agentData.decision.outcome as "APPROVED" | "REJECTED",
+						reason: agentData.decision.reason,
+						timestamp: agentData.audit?.timestamp || new Date().toISOString(),
+					},
+				},
+			});
 
-		// Send the signal
-		// Note: In a real app we might map string names to imported signal definitions to ensure type safety,
-		// but client.workflow.getHandle().signal("name") works with string names too if not using the definition directly.
-		// To use the definition, we'd need a mapping or switch.
+			console.log(`[API] Sent Agent Callback event for Workflow ${workflowId}`);
+			return NextResponse.json({
+				success: true,
+				signal: "agentCallbackReceived",
+			});
+		}
 
-		await handle.signal(signalName, payload);
-
-		console.log(`[API] Signaled ${temporalWorkflowId} with ${signalName}`);
-
-		return NextResponse.json({ success: true });
+		// Failed both validations
+		return NextResponse.json(
+			{
+				error: "Invalid signal data",
+				details: {
+					uiError: uiValidation.error.flatten(),
+					agentError: agentValidation.error.flatten(),
+				},
+			},
+			{ status: 400 },
+		);
 	} catch (error) {
 		console.error("Error signaling workflow:", error);
+		const message = error instanceof Error ? error.message : "Unexpected error";
 		return NextResponse.json(
-			{ error: "Failed to signal workflow" },
+			{ error: "Failed to signal workflow", details: message },
 			{ status: 500 },
 		);
 	}

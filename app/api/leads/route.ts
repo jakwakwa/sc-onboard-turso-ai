@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabaseClient } from "@/app/utils";
-import { leads } from "@/db/schema";
+import { leads, workflows } from "@/db/schema";
 import { createLeadSchema } from "@/lib/validations";
+import { inngest } from "@/inngest";
 
 /**
  * GET /api/leads
@@ -30,7 +31,7 @@ export async function GET() {
 
 /**
  * POST /api/leads
- * Create a new lead
+ * Create a new lead and start the onboarding workflow
  */
 export async function POST(request: NextRequest) {
 	try {
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 
 		const data = validation.data;
 
-		// Insert the new lead - using ALL fields including optional ones
+		// Insert the new lead
 		const newLeadResults = await db
 			.insert(leads)
 			.values({
@@ -78,7 +79,41 @@ export async function POST(request: NextRequest) {
 
 		const newLead = newLeadResults[0];
 
-		return NextResponse.json({ lead: newLead }, { status: 201 });
+		if (!newLead) {
+			throw new Error("Failed to create lead record in database");
+		}
+
+		// Create the initial Workflow record in DB
+		const [newWorkflow] = await db
+			.insert(workflows)
+			.values({
+				leadId: newLead.id,
+				stage: 1,
+				stageName: "lead_capture",
+				status: "pending",
+				currentAgent: "platform",
+			})
+			.returning();
+
+		if (!newWorkflow) {
+			throw new Error("Failed to create workflow record");
+		}
+
+		// Start the Inngest Workflow
+		try {
+			await inngest.send({
+				name: "onboarding/started",
+				data: { leadId: newLead.id, workflowId: newWorkflow.id },
+			});
+			console.log(`[API] Started Inngest workflow for lead ${newLead.id}`);
+		} catch (inngestError) {
+			console.error("[API] Failed to start Inngest workflow:", inngestError);
+		}
+
+		return NextResponse.json(
+			{ lead: newLead, workflow: newWorkflow },
+			{ status: 201 },
+		);
 	} catch (error) {
 		console.error("Error creating lead:", error);
 		const message = error instanceof Error ? error.message : "Unexpected error";
