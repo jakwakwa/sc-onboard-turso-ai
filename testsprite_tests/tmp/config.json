@@ -1,0 +1,19 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "loginUser": "test@demo.com",
+  "loginPassword": "pw1234-#",
+  "executionArgs": {
+    "projectName": "sc-onboard-controltower",
+    "projectPath": "/Users/jacobkotzee/Projects/REPOS/ai-webapps/sc-onboard-controltower",
+    "testIds": [],
+    "additionalInstruction": "Focus on testing the main dashboard functionality, applicant management system, and authentication flow. Test the key user journeys for loan application processing.",
+    "envs": {
+      "API_KEY": "sk-user-4ufLYgTODuFodLjLbTL0aGirX97FMJm0ujj0JHDbub3KzlmrdNrL17y4xwFD-6rePJopSc4-4ixQ4DeKfHXS9-FbsVvBx_ZgLCVmaxXc0XQD8R8eoMYxM52kyzbXRp7uVTE"
+    }
+  },
+  "serverPort": 59587,
+  "proxy": "http://aebcf8a7-1637-4d0a-9e7a-f7f4ffc4f401:qCV35vNafqsHOZPY76SFuh5Pv0tUy456@tun.testsprite.com:8080"
+}

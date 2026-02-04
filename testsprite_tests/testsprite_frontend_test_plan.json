@@ -1,0 +1,480 @@
+[
+  {
+    "id": "TC001",
+    "title": "Applicant Details Input and AI Quotation Generation",
+    "description": "Verify that the account manager can input applicant details correctly and the system generates an AI-powered quotation including overlimit notifications when applicable.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as account manager and navigate to new applicant entry form"
+      },
+      {
+        "type": "action",
+        "description": "Input applicant details including company info, contact info, and risk parameters"
+      },
+      {
+        "type": "action",
+        "description": "Submit the form to trigger AI quotation calculation"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that an AI-generated quotation is returned with accurate fee calculations"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the system triggers an overlimit notification if quotation exceeds predefined thresholds"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Quote Signing and Workflow Trigger",
+    "description": "Ensure the applicant can receive a quote via email, digitally sign it, and that signing triggers the next workflow steps.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate sending quote email to applicant"
+      },
+      {
+        "type": "action",
+        "description": "Applicant opens the email and accesses the quote signing interface"
+      },
+      {
+        "type": "action",
+        "description": "Applicant applies digital signature and submits the signed quote"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that the workflow proceeds to 'Facility Application' step after quote signing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that a notification is sent to account and risk managers about quote signing"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Facility Application Form Availability Post Quotation Approval",
+    "description": "Check that facility application forms are only emailed and available for applicant completion after quotation approval.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Approve the quotation as a manager"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate that facility application email is triggered to the applicant"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to access facility application forms before quotation approval"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm that access to application forms is denied before approval"
+      },
+      {
+        "type": "action",
+        "description": "Access facility application forms after approval"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that forms are accessible and editable by the applicant"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Mandate Determination and Parallel Workflow Branching",
+    "description": "Verify mandate type determination triggers correct parallel workflow branches for procurement checks and document submission.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Submit facility application with mandate information"
+      },
+      {
+        "type": "assertion",
+        "description": "System correctly determines mandate type based on application data"
+      },
+      {
+        "type": "assertion",
+        "description": "Workflow splits into parallel paths: procurement check with risk manager review and mandate document submission"
+      },
+      {
+        "type": "action",
+        "description": "Complete each parallel path and submit results"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that workflow waits for both parallel branches to complete before proceeding"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "AI Analysis of Submitted Documents and Aggregation of Results",
+    "description": "Ensure AI analyzes all submitted documents for bank validation, risk assessment, and sanction screening, then aggregates results for final manager review.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Applicant submits mandated documents after parallel workflow step"
+      },
+      {
+        "type": "action",
+        "description": "Trigger AI analysis service to process submitted documents"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify AI correctly performs bank validation, risk checks, and sanction screening on each document"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm aggregation service compiles AI findings into comprehensive review report"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure final aggregated results are available and visible to risk managers"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Final Risk Manager Review and Approval Workflow",
+    "description": "Test that risk managers can perform final review with options to approve or deny application, triggering appropriate workflow next steps or denial paths.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as risk manager and access final review queue"
+      },
+      {
+        "type": "action",
+        "description": "Review aggregated AI analysis and submitted contract/forms"
+      },
+      {
+        "type": "action",
+        "description": "Select 'Approve' and submit decision"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify workflow advances to contract and ABSA form submission step"
+      },
+      {
+        "type": "action",
+        "description": "Repeat review and select 'Deny' option"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that workflow immediately terminates and denial notifications are sent to applicant and managers"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Contract and ABSA Form Submission Post-Final Approval",
+    "description": "Confirm account manager can upload contracts and ABSA forms after final approval and that applicants receive and can sign these forms.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Complete final approval and trigger contract/ABSA form availability"
+      },
+      {
+        "type": "action",
+        "description": "Account manager uploads contract and ABSA forms"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify applicant receives notification/email with form links"
+      },
+      {
+        "type": "action",
+        "description": "Applicant accesses and digitally signs contract and ABSA forms"
+      },
+      {
+        "type": "assertion",
+        "description": "Check system records signatures and marks forms as completed"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Workflow Pauses and Resumes on Manual Review with Notifications",
+    "description": "Verify that workflow correctly pauses at manual review steps, sends notifications, and resumes automatically upon approval or denial without manual tracking.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger a manual review step requiring risk or account manager input"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm workflow status shows as paused"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify email/SMS notifications are sent to assigned reviewers"
+      },
+      {
+        "type": "action",
+        "description": "Perform manual approval or denial action in system"
+      },
+      {
+        "type": "assertion",
+        "description": "Check workflow automatically resumes and advances accordingly"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure no manual override or tracking needed to resume workflow"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Immediate Denial Handling and Notification",
+    "description": "Test the workflow's immediate termination and notification process when an application is denied at any stage.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Submit denial decision during quotation approval or risk review"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify workflow transitions to denial state immediately"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that denial notifications are sent promptly to applicant and all relevant managers"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no further workflow events are processed after denial"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Sequential and Parallel Workflow Step Execution Validation",
+    "description": "Validate that the workflow engine enforces sequential and parallel processing correctly, preventing premature form requests or progress.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to access forms or workflow stages out-of-sequence"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure access is blocked for unapproved or prerequisite steps"
+      },
+      {
+        "type": "action",
+        "description": "Complete sequential steps properly and verify transitions"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm parallel branches execute independently and workflow waits for all to finish"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Notification Delivery Timing and Content Accuracy",
+    "description": "Check that all notification messages (email/SMS) related to workflow events are sent timely with correct recipient, content, and context.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger key workflow events: quotation approval, form availability, manual review, denial, final approval"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate receipt of notifications within expected timeframe"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that notifications contain accurate and relevant information for recipients"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Logging Completeness and Dashboard Visibility",
+    "description": "Verify all workflow steps, decisions, and errors are logged properly and visible on the monitoring dashboard for audit and transparency purposes.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Execute a full end-to-end workflow with mixed decision outcomes"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that each step and transition is recorded in logs"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate that decisions, approvals, denials, and errors appear on the dashboard"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Workflow Automation Rate and Completion Time Validation",
+    "description": "Assert that standard cases achieve at least 80% automation and reduce overall workflow completion time by 30% compared to baseline.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Run multiple standard onboarding cases through the workflow engine"
+      },
+      {
+        "type": "assertion",
+        "description": "Measure and report percentage of automated steps completed without manual intervention"
+      },
+      {
+        "type": "assertion",
+        "description": "Compare total workflow completion time against previous baseline and verify 30% reduction"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Edge Case: Missing Mandatory Applicant Details",
+    "description": "Verify system behavior when mandatory fields in applicant details are missing or invalid during initial input.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to submit applicant details form with missing mandatory fields"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that proper validation errors are displayed"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid data formats (e.g., invalid email, phone)"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm form submission is blocked and user is prompted to correct errors"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Error Handling for AI Service Failures",
+    "description": "Test system's handling and user notification when AI services for quotation or document analysis fail or return errors.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate AI quotation service failure during applicant detail submission"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure system logs error and shows an informative message to user"
+      },
+      {
+        "type": "action",
+        "description": "Simulate AI document analysis failure after document submission"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify workflow pauses or flags error state, notifies managers, and prevents incorrect approvals"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Edge Case: Partial Completion of Parallel Workflow Branches",
+    "description": "Verify that workflow correctly handles scenario where one parallel branch completes and another remains pending.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Complete only one branch of the parallel mandate workflow"
+      },
+      {
+        "type": "assertion",
+        "description": "Observe that workflow remains paused until all parallel branches complete"
+      },
+      {
+        "type": "action",
+        "description": "Complete remaining branch"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm workflow resumes and progresses as expected"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Edge Case: Applicant Attempts to Sign Expired Quote",
+    "description": "Check system prevents signing of quotes after their validity period has expired and informs applicant appropriately.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate quote expiration by manipulating system time or quote expiry field"
+      },
+      {
+        "type": "action",
+        "description": "Applicant attempts to sign expired quote"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify system blocks signing and displays expiration message"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Form Validation on Facility Application and Mandate Documents",
+    "description": "Ensure all forms enforce Zod-based validation schemas, including boundary cases and invalid data inputs.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Fill facility application and mandate forms with valid data to confirm acceptance"
+      },
+      {
+        "type": "assertion",
+        "description": "Forms submit successfully without validation errors"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid or boundary data values into each form field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify form validation catches all errors and prevents submission"
+      }
+    ]
+  }
+]

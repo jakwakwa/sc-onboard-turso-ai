@@ -1,0 +1,192 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "Next.js 16",
+    "React 19",
+    "SQLite",
+    "Drizzle ORM",
+    "Tailwind CSS",
+    "Clerk Auth",
+    "Inngest",
+    "Turso Database",
+    "Zod",
+    "React Hook Form",
+    "Framer Motion",
+    "Resend Email",
+    "Google Vertex AI",
+    "Radix UI",
+    "Zustand"
+  ],
+  "features": [
+    {
+      "name": "Authentication System",
+      "description": "Clerk-based authentication with user management and protected routes",
+      "files": ["app/layout.tsx", "app/(authenticated)/layout.tsx"]
+    },
+    {
+      "name": "Applicant Management",
+      "description": "Complete CRUD system for managing loan applicants with company details, contact info, and risk assessment",
+      "files": [
+        "app/(authenticated)/dashboard/applicants/page.tsx",
+        "app/(authenticated)/dashboard/applicants/[id]/page.tsx",
+        "app/(authenticated)/dashboard/applicants/new/page.tsx",
+        "components/dashboard/applicant-form.tsx",
+        "components/dashboard/applicants-table.tsx"
+      ]
+    },
+    {
+      "name": "Dashboard System",
+      "description": "Comprehensive dashboard with stats, navigation, and data visualization for loan processing workflow",
+      "files": [
+        "app/(authenticated)/dashboard/page.tsx",
+        "components/dashboard/dashboard-layout.tsx",
+        "components/dashboard/dashboard-shell.tsx",
+        "components/dashboard/sidebar.tsx",
+        "components/dashboard/stats-card.tsx",
+        "components/dashboard/activity-feed.tsx"
+      ]
+    },
+    {
+      "name": "Workflow Engine",
+      "description": "Multi-stage workflow system for processing loan applications with Inngest integration",
+      "files": [
+        "inngest/functions/onboarding-v2.ts",
+        "inngest/functions/document-aggregator.ts",
+        "components/dashboard/workflow-table.tsx",
+        "components/dashboard/workflow-progress-stepper.tsx",
+        "lib/services/workflow.service.ts",
+        "lib/actions/workflow.actions.ts"
+      ]
+    },
+    {
+      "name": "Document Management",
+      "description": "Upload, verification, and processing system for FICA documents and bank statements",
+      "files": [
+        "components/onboarding-forms/fica-upload/index.tsx",
+        "lib/services/pdf-extract.service.ts",
+        "lib/validations/onboarding/fica-documents.ts"
+      ]
+    },
+    {
+      "name": "Risk Assessment System",
+      "description": "AI-powered risk analysis using Google Vertex AI for credit scoring and compliance checks",
+      "files": [
+        "app/(authenticated)/dashboard/risk-review/page.tsx",
+        "components/dashboard/risk-review/risk-review-queue.tsx",
+        "components/dashboard/risk-review/risk-review-detail.tsx",
+        "lib/services/risk.service.ts",
+        "lib/services/fica-ai.service.ts",
+        "lib/ai/models.ts"
+      ]
+    },
+    {
+      "name": "Quote Generation System",
+      "description": "Automated quote generation with fee calculation and approval workflow",
+      "files": [
+        "app/(authenticated)/dashboard/applicants/[id]/quote/page.tsx",
+        "components/dashboard/quote-approval-form.tsx",
+        "lib/services/quote.service.ts",
+        "lib/validations/quotes.ts"
+      ]
+    },
+    {
+      "name": "Form System",
+      "description": "Multi-step form wizard for facility applications, agreements, and ABSA forms with magic link distribution",
+      "files": [
+        "components/onboarding-forms/form-wizard.tsx",
+        "components/onboarding-forms/facility-application/index.tsx",
+        "components/onboarding-forms/stratcol-agreement/index.tsx",
+        "components/onboarding-forms/absa-6995/index.tsx",
+        "components/forms/form-renderer.tsx",
+        "lib/services/form.service.ts",
+        "lib/services/form-link.service.ts"
+      ]
+    },
+    {
+      "name": "Agent Management",
+      "description": "External agent fleet monitoring with callback handling and status tracking",
+      "files": [
+        "app/(authenticated)/dashboard/agents/page.tsx",
+        "components/dashboard/agent-status-card.tsx",
+        "lib/services/agent-stats.ts"
+      ]
+    },
+    {
+      "name": "Notification System",
+      "description": "Real-time notifications with email integration using Resend and workflow event tracking",
+      "files": [
+        "components/dashboard/notifications-panel.tsx",
+        "components/emails/EmailLayout.tsx",
+        "components/emails/InternalAlert.tsx",
+        "components/emails/ApplicantFormLinks.tsx",
+        "lib/services/notification.service.ts",
+        "lib/services/notification-events.service.ts",
+        "lib/services/email.service.tsx"
+      ]
+    },
+    {
+      "name": "Digital Signature System",
+      "description": "Canvas-based digital signature capture with integrity verification",
+      "files": [
+        "components/onboarding-forms/signature-canvas.tsx"
+      ]
+    },
+    {
+      "name": "Database Schema",
+      "description": "Comprehensive SQLite schema with Drizzle ORM for applicants, workflows, documents, and risk assessments",
+      "files": [
+        "db/schema.ts",
+        "drizzle.config.ts"
+      ]
+    },
+    {
+      "name": "API Integration Services",
+      "description": "Third-party integrations for credit checks (ITC, Experian), ProcureCheck API, and V24/V27 sync",
+      "files": [
+        "lib/services/itc.service.ts",
+        "lib/services/experian.types.ts",
+        "lib/services/v24.service.ts",
+        "lib/procurecheck.ts"
+      ]
+    },
+    {
+      "name": "UI Components Library",
+      "description": "Reusable UI components built with Radix UI and Tailwind CSS including tables, forms, dialogs, and status indicators",
+      "files": [
+        "components/ui/button.tsx",
+        "components/ui/input.tsx",
+        "components/ui/table.tsx",
+        "components/ui/dialog.tsx",
+        "components/ui/card.tsx",
+        "components/ui/badge.tsx",
+        "components/ui/status-badge.tsx",
+        "components/ui/data-table.tsx",
+        "components/ui/field.tsx"
+      ]
+    },
+    {
+      "name": "Landing Page",
+      "description": "Marketing landing page with hero section, features showcase, and trusted partners display",
+      "files": [
+        "app/page.tsx",
+        "components/landing/hero.tsx",
+        "components/landing/features.tsx",
+        "components/landing/trusted-by.tsx",
+        "components/landing/footer.tsx"
+      ]
+    },
+    {
+      "name": "Form Validation System",
+      "description": "Zod-based validation schemas for all forms including facility applications, FICA documents, and quotes",
+      "files": [
+        "lib/validations/onboarding/facility-application.ts",
+        "lib/validations/onboarding/stratcol-agreement.ts",
+        "lib/validations/onboarding/absa-6995.ts",
+        "lib/validations/onboarding/fica-documents.ts",
+        "lib/validations/forms.ts",
+        "lib/validations/quotes.ts",
+        "lib/validations.ts"
+      ]
+    }
+  ]
+}

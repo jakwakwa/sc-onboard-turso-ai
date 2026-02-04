@@ -1,0 +1,215 @@
+import asyncio
+from playwright import async_api
+
+async def run_test():
+    pw = None
+    browser = None
+    context = None
+
+    try:
+        # Start a Playwright session in asynchronous mode
+        pw = await async_api.async_playwright().start()
+
+        # Launch a Chromium browser in headless mode with custom arguments
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=[
+                "--window-size=1280,720",         # Set the browser window size
+                "--disable-dev-shm-usage",        # Avoid using /dev/shm which can cause issues in containers
+                "--ipc=host",                     # Use host-level IPC for better stability
+                "--single-process"                # Run the browser in a single process mode
+            ],
+        )
+
+        # Create a new browser context (like an incognito window)
+        context = await browser.new_context()
+        context.set_default_timeout(5000)
+
+        # Open a new page in the browser context
+        page = await context.new_page()
+
+        # Navigate to your target URL and wait until the network request is committed
+        await page.goto("http://localhost:3000", wait_until="commit", timeout=10000)
+
+        # Wait for the main page to reach DOMContentLoaded state (optional for stability)
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=3000)
+        except async_api.Error:
+            pass
+
+        # Iterate through all iframes and wait for them to load as well
+        for frame in page.frames:
+            try:
+                await frame.wait_for_load_state("domcontentloaded", timeout=3000)
+            except async_api.Error:
+                pass
+
+        # Interact with the page elements to simulate user flow
+        # -> Navigate to http://localhost:3000
+        await page.goto("http://localhost:3000", wait_until="commit", timeout=10000)
+        
+        # -> Click 'Sign In' to open authentication page so the test user can sign in (index 86). After sign-in, locate applicant/quote management to simulate expiration.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/main/section[1]/div[2]/div[2]/a[2]/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the authentication/login UI (re-attempt clicking 'Sign In' if needed) so the test user can sign in with provided credentials (test@demo.com / pw1234-#).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/main/section[1]/div[2]/div[2]/a[2]/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Enter test email into the email field and click Continue to proceed to the password step.
+        frame = context.pages[-1]
+        # Input text
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div[1]/div[2]/form/div[1]/div[1]/div/div[1]/input').nth(0)
+        await page.wait_for_timeout(3000); await elem.fill('test@demo.com')
+        
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div[1]/div[2]/form/div[2]/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Enter the password (pw1234-#) into the password field (index 777) and click Continue (index 791) to sign in.
+        frame = context.pages[-1]
+        # Input text
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div/div[2]/form/div/div/div[1]/div[2]/input').nth(0)
+        await page.wait_for_timeout(3000); await elem.fill('pw1234-#')
+        
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div/div[2]/form/button[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Submit the password by clicking Continue (index 791) to complete sign-in; after successful sign-in, navigate to applicant/quote management to simulate quote expiration.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div/div[2]/form/button[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the Applicants list to locate the applicant and their quote so the quote expiry can be modified (click 'Applicants' in the sidebar).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[3]/aside/nav/a[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the Applicants list by clicking the 'Applicants' link in the sidebar so an applicant and their quote can be located (click element index 1196).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[3]/aside/nav/a[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open an applicant's details to locate their quote(s) so the quote expiry can be modified.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[3]/main/div/section/div[2]/div/div/table/tbody/tr[1]/td[7]/div/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the applicant's details by clicking 'View Details' in the Actions menu so the applicant's quote(s) can be located (click element index 2193).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[6]/div/a').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the specific applicant's Actions menu (if closed) and then open 'View Details' to access the applicant's quotes so expiry can be modified.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[3]/main/div/section/div[2]/div/div/table/tbody/tr[1]/td[7]/div/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[5]/div/a').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open applicant's Forms (or documents/quote) section to locate quote management so expiry can be modified (click 'Forms' tab).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/main/div/div/div[2]/div/div[1]/button[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the 'Documents & FICA' tab to locate quotes or offer documents and access quote management to modify expiry.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/main/div/div/div[2]/div/div[1]/button[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the 'Overview' tab for this applicant to look for quotes/offers or links to quote management so expiry can be modified.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/main/div/div/div[2]/div/div[1]/button[1]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the Workflows page from the sidebar to look for any quotes/offers or workflow items that manage quote creation so the quote expiry can be located and edited.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/aside/nav/a[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Click the 'Workflows' link in the sidebar to open Workflows and locate the workflow/quote that can be edited to simulate expiry.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/aside/nav/a[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the actions menu for the first workflow row (Test Company 1) so the workflow details or navigation option can be selected to access quote management.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/main/div/section/div[2]/div/div/div/table/tbody/tr[1]/td[7]/div/button[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Click 'View Applicant Details' from the open workflow actions menu to open the applicant details for the selected workflow so the quote(s) can be located and edited (index 3728).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[6]/div/a[1]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Click 'View Applicant Details' from the open workflow actions menu to open the applicant and access their quote(s) (click element index 3728).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[5]/div/a[1]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the Workflows page (via the sidebar) to locate the workflow/quote so the quote expiry can be found and modified.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/aside/nav/a[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the Workflows page from the sidebar to locate the workflow/quote so the quote expiry can be found and edited.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/aside/nav/a[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the actions menu for the first workflow row (Test Company 1) to access workflow details so the quote/offer and its expiry can be located and edited.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[2]/main/div/section/div[2]/div/div/div/table/tbody/tr[1]/td[7]/div/button[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Click 'View Workflow Graph' from the open workflow actions menu to open the workflow graph and locate the quote/offer node so the expiry can be found/edited (click element index 5004).
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[6]/div/a[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        # -> Open the workflow graph for the selected workflow (Test Company 1) so the quote/offer node and expiry can be located and edited.
+        frame = context.pages[-1]
+        # Click element
+        elem = frame.locator('xpath=html/body/div[5]/div/a[2]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+        await asyncio.sleep(5)
+
+    finally:
+        if context:
+            await context.close()
+        if browser:
+            await browser.close()
+        if pw:
+            await pw.stop()
+
+asyncio.run(run_test())
+    

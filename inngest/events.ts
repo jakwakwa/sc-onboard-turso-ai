@@ -302,6 +302,17 @@ export type Events = {
 		};
 	};
 
+	/** KILL SWITCH: Immediate workflow termination on procurement denial */
+	"risk/procurement.kill": {
+		data: {
+			workflowId: number;
+			applicantId: number;
+			killedBy: string;
+			reason: string;
+			timestamp: string;
+		};
+	};
+
 	// ================================================================
 	// Mandate & Document Events
 	// ================================================================

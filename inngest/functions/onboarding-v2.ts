@@ -196,10 +196,18 @@ type FicaUploadEvent = {
 const OVERLIMIT_THRESHOLD = 500_000_00; // R500,000 in cents
 
 const MANDATE_DOCUMENT_REQUIREMENTS: Record<string, string[]> = {
-	EFT: ["BANK_CONFIRMATION", "MANDATE_FORM"],
-	DEBIT_ORDER: ["DEBIT_ORDER_MANDATE", "BANK_CONFIRMATION"],
+	EFT: ["BANK_CONFIRMATION", "EFT_MANDATE_FORM"],
+	DEBIT_ORDER: ["DEBIT_ORDER_MANDATE", "BANK_STATEMENT_3M"],
 	CASH: ["PROOF_OF_REGISTRATION"],
-	MIXED: ["BANK_CONFIRMATION", "MANDATE_FORM", "DEBIT_ORDER_MANDATE"],
+	MIXED: ["BANK_CONFIRMATION", "EFT_MANDATE_FORM", "DEBIT_ORDER_MANDATE"],
+};
+
+// Business-type specific document requirements (simplified)
+const BUSINESS_TYPE_DOCUMENTS: Record<string, string[]> = {
+	NPO: ["NPO_REGISTRATION", "TAX_EXEMPTION_CERTIFICATE", "BOARD_RESOLUTION"],
+	PROPRIETOR: ["INDIVIDUAL_ID", "PROOF_OF_RESIDENCE"],
+	COMPANY: ["CIPC_REGISTRATION", "DIRECTOR_DETAILS", "COMPANY_RESOLUTION"],
+	TRUST: ["TRUST_DEED", "LETTERS_AUTHORITY", "TRUSTEE_DETAILS"],
 };
 
 // ============================================
@@ -218,13 +226,22 @@ async function checkOverlimit(quoteAmount: number): Promise<{
 	};
 }
 
-function determineMandateRequirements(mandateType: string): {
+function determineMandateRequirements(
+	mandateType: string,
+	businessType?: string
+): {
 	requiredDocuments: string[];
 	requiresProcurementCheck: boolean;
 } {
-	const requiredDocuments = MANDATE_DOCUMENT_REQUIREMENTS[mandateType] || [
-		"MANDATE_FORM",
-	];
+	// Get mandate-specific documents
+	const mandateDocs = MANDATE_DOCUMENT_REQUIREMENTS[mandateType] || ["MANDATE_FORM"];
+
+	// Get business-type specific documents (if provided)
+	const businessDocs = businessType ? BUSINESS_TYPE_DOCUMENTS[businessType] || [] : [];
+
+	// Combine and deduplicate
+	const requiredDocuments = [...new Set([...mandateDocs, ...businessDocs])];
+
 	// Procurement check required for EFT and MIXED mandates
 	const requiresProcurementCheck = mandateType === "EFT" || mandateType === "MIXED";
 
@@ -607,7 +624,7 @@ export const onboardingWorkflowV2 = inngest.createFunction(
 		const mandateInfo = await step.run("determine-mandate-type", async () => {
 			const { formData } = facilityFormEvent.data;
 			const { requiredDocuments, requiresProcurementCheck } =
-				determineMandateRequirements(formData.mandateType);
+				determineMandateRequirements(formData.mandateType, formData.businessType);
 
 			await logWorkflowEvent({
 				workflowId,

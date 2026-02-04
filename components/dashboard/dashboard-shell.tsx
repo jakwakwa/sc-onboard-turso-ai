@@ -7,15 +7,27 @@ import { UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDashboardStore } from "@/lib/dashboard-store";
+import { useNotifications } from "@/hooks/use-notifications";
 
 interface DashboardShellProps {
 	children: React.ReactNode;
 	notifications?: WorkflowNotification[];
 }
 
-export function DashboardShell({ children, notifications = [] }: DashboardShellProps) {
+export function DashboardShell({
+	children,
+	notifications: initialNotifications = [],
+}: DashboardShellProps) {
 	const router = useRouter();
 	const [isCollapsed, setIsCollapsed] = useState(false);
+
+	// Real-time polling for notifications (every 10 seconds)
+	const { notifications, markAsRead, markAllAsRead, deleteNotification } =
+		useNotifications({
+			initialNotifications,
+			pollingInterval: 10000,
+			enabled: true,
+		});
 
 	const { title, description, actions } = useDashboardStore();
 
@@ -43,16 +55,7 @@ export function DashboardShell({ children, notifications = [] }: DashboardShellP
 							{actions}
 							<NotificationsPanel
 								notifications={notifications}
-								onMarkAllRead={async () => {
-									try {
-										await fetch("/api/notifications/mark-all-read", {
-											method: "POST",
-										});
-										router.refresh();
-									} catch (e) {
-										console.error("Failed to mark all read", e);
-									}
-								}}
+								onMarkAllRead={markAllAsRead}
 								onAction={async (notification, action) => {
 									try {
 										if (action === "view") {
@@ -66,7 +69,6 @@ export function DashboardShell({ children, notifications = [] }: DashboardShellP
 										}
 
 										if (action === "retry" || action === "cancel") {
-											// Call resolve-error API for workflow actions
 											await fetch(
 												`/api/workflows/${notification.workflowId}/resolve-error`,
 												{
@@ -77,12 +79,8 @@ export function DashboardShell({ children, notifications = [] }: DashboardShellP
 											);
 										}
 
-										// Mark notification as read
-										await fetch(`/api/notifications/${notification.id}`, {
-											method: "PATCH",
-										});
-
-										router.refresh();
+										// Mark notification as read (instant update via hook)
+										await markAsRead(notification.id);
 									} catch (e) {
 										console.error("Action failed", e);
 									}
@@ -95,26 +93,13 @@ export function DashboardShell({ children, notifications = [] }: DashboardShellP
 											: `/dashboard/applicants/${notification.applicantId}`;
 										router.push(route);
 
-										// Mark notification as read
-										await fetch(`/api/notifications/${notification.id}`, {
-											method: "PATCH",
-										});
-
-										router.refresh();
+										// Mark notification as read (instant update via hook)
+										await markAsRead(notification.id);
 									} catch (e) {
 										console.error("Click handler failed", e);
 									}
 								}}
-								onDelete={async notification => {
-									try {
-										await fetch(`/api/notifications/${notification.id}`, {
-											method: "DELETE",
-										});
-										router.refresh();
-									} catch (e) {
-										console.error("Delete failed", e);
-									}
-								}}
+								onDelete={notification => deleteNotification(notification.id)}
 							/>
 							<div suppressHydrationWarning>
 								<UserButton />

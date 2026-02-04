@@ -16,6 +16,7 @@ import { getDatabaseClient } from "@/app/utils";
 import { workflows, workflowEvents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
+import { executeKillSwitch } from "@/lib/services/kill-switch.service";
 
 // ============================================
 // Request Schema
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const { workflowId, applicantId, procureCheckResult, decision } = validationResult.data;
+		const { workflowId, applicantId, procureCheckResult, decision } =
+			validationResult.data;
 
 		console.log(`[ProcurementDecision] Processing decision for workflow ${workflowId}:`, {
 			outcome: decision.outcome,
@@ -109,7 +111,39 @@ export async function POST(request: NextRequest) {
 			actorType: "user",
 		});
 
-		// Send the event to Inngest to resume the workflow
+		// If DENIED, execute kill switch to terminate all parallel processes
+		if (decision.outcome === "DENIED") {
+			console.log(
+				`[ProcurementDecision] DENIED - Executing kill switch for workflow ${workflowId}`
+			);
+
+			const killResult = await executeKillSwitch({
+				workflowId,
+				applicantId,
+				killedBy: userId,
+				reason: decision.reason || "Procurement check failed",
+			});
+
+			if (!killResult.success) {
+				console.error(`[ProcurementDecision] Kill switch failed: ${killResult.error}`);
+			}
+
+			return NextResponse.json({
+				success: true,
+				message: "Workflow terminated - Procurement denied",
+				workflowId,
+				applicantId,
+				decision: {
+					outcome: decision.outcome,
+					decidedBy: userId,
+					timestamp: new Date().toISOString(),
+				},
+				terminated: true,
+				invalidatedForms: killResult.invalidatedForms,
+			});
+		}
+
+		// For CLEARED decisions, send the event to Inngest to resume the workflow
 		await inngest.send({
 			name: "risk/procurement.completed",
 			data: {
@@ -130,7 +164,9 @@ export async function POST(request: NextRequest) {
 			},
 		});
 
-		console.log(`[ProcurementDecision] Event sent to Inngest for workflow ${workflowId}`);
+		console.log(
+			`[ProcurementDecision] CLEARED - Event sent to Inngest for workflow ${workflowId}`
+		);
 
 		// Return success response
 		return NextResponse.json({
