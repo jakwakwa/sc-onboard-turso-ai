@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { inngest } from "@/inngest";
 import { getDatabaseClient, getBaseUrl } from "@/app/utils";
-import { documents } from "@/db/schema";
+import { applicants, documents } from "@/db/schema";
 import { DocumentCategorySchema, DocumentTypeSchema } from "@/lib/types";
 import {
 	getFormInstanceByToken,
@@ -129,6 +130,70 @@ export async function POST(request: NextRequest) {
 
 		if (formInstance.status !== "submitted") {
 			await markFormInstanceStatus(formInstance.id, "submitted");
+		}
+
+		// Fire document/mandate.submitted so the Inngest workflow can proceed.
+		// This signals that the applicant has uploaded documents from the upload page.
+		if (formInstance.workflowId) {
+			// Gather all documents uploaded so far for this applicant
+			const allDocs = await db
+				.select()
+				.from(documents)
+				.where(eq(documents.applicantId, formInstance.applicantId));
+
+			const uploadedTypes = allDocs
+				.filter(d => d.status === "uploaded")
+				.map(d => d.type);
+
+			// Look up the applicant's mandateType for the event payload
+			const applicantResults = await db
+				.select()
+				.from(applicants)
+				.where(eq(applicants.id, formInstance.applicantId));
+			const applicant = applicantResults[0];
+			const mandateType = (applicant?.mandateType || "EFT") as
+				| "EFT"
+				| "DEBIT_ORDER"
+				| "CASH"
+				| "MIXED";
+
+			await inngest.send({
+				name: "document/mandate.submitted",
+				data: {
+					workflowId: formInstance.workflowId,
+					applicantId: formInstance.applicantId,
+					mandateType,
+					documents: allDocs
+						.filter(d => d.status === "uploaded")
+						.map(d => ({
+							documentId: d.id,
+							documentType: d.type,
+							fileName: d.fileName || "",
+							uploadedAt: d.uploadedAt?.toISOString() || new Date().toISOString(),
+						})),
+					allRequiredDocsReceived: uploadedTypes.length > 0,
+				},
+			});
+
+			// Also fire upload/fica.received if FICA documents were included
+			const ficaDocTypes = ["BANK_STATEMENT", "ACCOUNTANT_LETTER", "ID_DOCUMENT", "PROOF_OF_ADDRESS"];
+			const ficaDocs = allDocs.filter(d => ficaDocTypes.includes(d.type.toUpperCase()) && d.status === "uploaded");
+
+			if (ficaDocs.length > 0) {
+				await inngest.send({
+					name: "upload/fica.received",
+					data: {
+						workflowId: formInstance.workflowId,
+						applicantId: formInstance.applicantId,
+						documents: ficaDocs.map(d => ({
+							type: d.type as any,
+							filename: d.fileName || "",
+							url: d.storageUrl || "",
+							uploadedAt: d.uploadedAt?.toISOString() || new Date().toISOString(),
+						})),
+					},
+				});
+			}
 		}
 
 		return NextResponse.json({

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getDatabaseClient } from "@/app/utils";
 import { workflows, applicants, workflowEvents } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 
 /**
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
 		}
 
-		// Fetch workflows awaiting risk review (stage 3, status awaiting_human)
+		// Fetch workflows awaiting risk review (stage 3 or 4, status awaiting_human)
 		const riskReviewWorkflows = await db
 			.select({
 				workflowId: workflows.id,
@@ -111,24 +111,50 @@ export async function GET(request: NextRequest) {
 			})
 			.from(workflows)
 			.leftJoin(applicants, eq(workflows.applicantId, applicants.id))
-			.where(and(eq(workflows.status, "awaiting_human"), eq(workflows.stage, 3)));
+			.where(
+				and(
+					eq(workflows.status, "awaiting_human"),
+					or(eq(workflows.stage, 3), eq(workflows.stage, 4))
+				)
+			);
 
 		// For each workflow, fetch the FICA analysis event to get AI analysis data
 		const itemsWithAnalysis = await Promise.all(
 			riskReviewWorkflows.map(async workflow => {
-				// Fetch FICA analysis event from workflow_events
-				const analysisEvents = await db
+				// Fetch all relevant events from workflow_events
+				const allEvents = await db
 					.select()
 					.from(workflowEvents)
-					.where(
-						and(
-							eq(workflowEvents.workflowId, workflow.workflowId),
-							eq(workflowEvents.eventType, "stage_change")
-						)
-					)
+					.where(eq(workflowEvents.workflowId, workflow.workflowId))
 					.orderBy(desc(workflowEvents.timestamp));
 
-				// Find the FICA verification event
+				// Check for existing approval decision
+				let isApproved = false;
+				let approvedAt: string | undefined;
+				let approvedBy: string | undefined;
+
+				for (const event of allEvents) {
+					// Check for procurement decision (Stage 3) or human override (any stage)
+					if (
+						event.eventType === "procurement_decision" ||
+						event.eventType === "human_override"
+					) {
+						try {
+							const payload = JSON.parse(event.payload || "{}");
+							const decision = payload.decision;
+							if (decision === "CLEARED" || decision === "APPROVED") {
+								isApproved = true;
+								approvedAt = event.timestamp?.toISOString();
+								approvedBy = event.actorId || undefined;
+								break;
+							}
+						} catch {
+							// Ignore parsing errors
+						}
+					}
+				}
+
+				// Find FICA verification event for AI analysis data
 				let aiTrustScore: number | undefined;
 				let riskFlags: Array<{
 					type: string;
@@ -143,10 +169,16 @@ export async function GET(request: NextRequest) {
 				let accountMatchVerified: boolean | undefined;
 				let analysisConfidence: number | undefined;
 
-				for (const event of analysisEvents) {
+				// Procurement-specific data
+				let procurementScore: number | undefined;
+				let anomalies: string[] = [];
+
+				for (const event of allEvents) {
 					if (event.payload) {
 						try {
 							const payload = JSON.parse(event.payload);
+
+							// Check for AI FICA verification
 							if (payload.step === "ai-fica-verification") {
 								aiTrustScore = payload.aiTrustScore;
 								riskFlags = payload.riskFlags || [];
@@ -156,7 +188,12 @@ export async function GET(request: NextRequest) {
 								nameMatchVerified = payload.nameMatchVerified;
 								accountMatchVerified = payload.accountMatchVerified;
 								analysisConfidence = payload.analysisConfidence;
-								break;
+							}
+
+							// Check for procurement check results
+							if (event.eventType === "procurement_check_completed") {
+								procurementScore = payload.riskScore;
+								anomalies = payload.anomalies || [];
 							}
 						} catch {
 							// Ignore parsing errors
@@ -181,7 +218,9 @@ export async function GET(request: NextRequest) {
 					clientName: workflow.contactName || "Unknown",
 					companyName: workflow.companyName || "Unknown Company",
 					stage: workflow.stage || 3,
-					stageName: "Risk Review",
+					stageName: workflow.stage === 3 ? "Procurement Review" : "Risk Review",
+					reviewType:
+						workflow.stage === 3 ? ("procurement" as const) : ("general" as const),
 					createdAt: workflow.startedAt
 						? new Date(workflow.startedAt).toISOString()
 						: new Date().toISOString(),
@@ -204,13 +243,25 @@ export async function GET(request: NextRequest) {
 					analysisConfidence: analysisConfidence || (aiTrustScore ? 75 : undefined),
 					bankStatementVerified: true, // If they're at stage 3, bank statement was received
 					accountantLetterVerified: false,
+					// Procurement-specific data
+					procurementScore,
+					hasAnomalies: anomalies.length > 0,
+					anomalies,
+					// Decision status
+					isApproved,
+					approvedAt,
+					approvedBy,
 				};
 			})
 		);
 
+		// Filter out already approved items from the queue
+		// (they should not appear in the queue, but we track the status for UX)
+		const pendingItems = itemsWithAnalysis.filter(item => !item.isApproved);
+
 		return NextResponse.json({
-			items: itemsWithAnalysis,
-			count: itemsWithAnalysis.length,
+			items: pendingItems,
+			count: pendingItems.length,
 		});
 	} catch (error) {
 		console.error("[API] Risk review fetch error:", error);
