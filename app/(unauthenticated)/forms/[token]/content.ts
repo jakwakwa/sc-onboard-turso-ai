@@ -17,6 +17,7 @@ export const formContent: Record<
 		schema: ZodTypeAny;
 		submitLabel: string;
 		defaultValues: Record<string, unknown>;
+		testData?: Record<string, unknown>;
 	}
 > = {
 	FACILITY_APPLICATION: {
@@ -32,8 +33,7 @@ export const formContent: Record<
 		sections: [
 			{
 				title: "Facility Selection",
-				description:
-					"Select the services required for your collections facility.",
+				description: "Select the services required for your collections facility.",
 				fields: [
 					{
 						name: "serviceTypes",
@@ -112,8 +112,7 @@ export const formContent: Record<
 			},
 			{
 				title: "Predicted Growth",
-				description:
-					"Share your expected transaction growth for the next three months.",
+				description: "Share your expected transaction growth for the next three months.",
 				fields: [
 					{
 						name: "forecastVolume",
@@ -154,6 +153,22 @@ export const formContent: Record<
 				],
 			},
 		],
+		testData: {
+			serviceTypes: ["EFT", "DebiCheck"],
+			additionalServices: ["Integration", "E-Mandate"],
+			currentProvider: "Previous Provider Ltd",
+			amountsOwed: "R0",
+			averageTransactionsPerMonth: 500,
+			unpaidTransactionsCount: 5,
+			unpaidTransactionsValue: 2500,
+			disputedTransactionsCount: 2,
+			disputedTransactionsValue: 1000,
+			forecastVolume: 750,
+			forecastAverageValue: 350,
+			maxTransactionsPerMonth: 1000,
+			maxRandValue: 500000,
+			highestSingleTransaction: 5000,
+		},
 	},
 	SIGNED_QUOTATION: {
 		title: "Signed Quotation",
@@ -430,8 +445,7 @@ export const formContent: Record<
 			},
 			{
 				title: "Agreement & Signature",
-				description:
-					"Confirm that the information is accurate and sign the agreement.",
+				description: "Confirm that the information is accurate and sign the agreement.",
 				fields: [
 					{
 						name: "consentAccepted",
@@ -455,11 +469,48 @@ export const formContent: Record<
 				],
 			},
 		],
+		testData: {
+			registeredName: "Test Company (Pty) Ltd",
+			proprietorName: "",
+			tradingName: "Test Trading Co",
+			registrationNumber: "2024/123456/07",
+			entityType: "Company",
+			"businessAddress.address": "123 Business Street, Sandton",
+			"businessAddress.postalCode": "2196",
+			"postalAddress.address": "PO Box 1234, Sandton",
+			"postalAddress.postalCode": "2196",
+			durationAtAddress: "5 years",
+			industryTenure: "10 years",
+			"authorisedRepresentative.name": "John Smith",
+			"authorisedRepresentative.idNumber": "8001015009087",
+			"authorisedRepresentative.position": "Director",
+			beneficialOwners: [
+				{
+					name: "Jane Doe",
+					idNumber: "8505050050080",
+					address: "456 Owner Lane, Johannesburg, 2000",
+					position: "Shareholder",
+					shareholdingPercent: 60,
+				},
+			],
+			"creditBankAccount.accountName": "Test Company (Pty) Ltd",
+			"creditBankAccount.bankName": "ABSA",
+			"creditBankAccount.branch": "Sandton",
+			"creditBankAccount.branchCode": "632005",
+			"creditBankAccount.accountNumber": "4098765432",
+			"debitBankAccount.accountName": "Test Company (Pty) Ltd",
+			"debitBankAccount.bankName": "ABSA",
+			"debitBankAccount.branch": "Sandton",
+			"debitBankAccount.branchCode": "632005",
+			"debitBankAccount.accountNumber": "4098765433",
+			consentAccepted: true,
+			signatureName: "John Smith",
+			signatureDate: new Date().toISOString().split("T")[0],
+		},
 	},
 	ABSA_6995: {
 		title: "Absa 6995 User Pre-screening Assessment",
-		description:
-			"Complete the Absa 6995 assessment. Fields marked with * are mandatory.",
+		description: "Complete the Absa 6995 assessment. Fields marked with * are mandatory.",
 		schema: absa6995Schema,
 		submitLabel: "Submit Absa 6995 form",
 		defaultValues: {
@@ -745,8 +796,7 @@ export const formContent: Record<
 					},
 					{
 						name: "previousHistory.wasExited",
-						label:
-							"Has your business been exited from a sponsoring bank or bureau?",
+						label: "Has your business been exited from a sponsoring bank or bureau?",
 						type: "select",
 						required: true,
 						options: [
@@ -993,8 +1043,7 @@ export const formContent: Record<
 			},
 			{
 				title: "Declarations & Warranties",
-				description:
-					"Please confirm each statement to proceed with the assessment.",
+				description: "Please confirm each statement to proceed with the assessment.",
 				fields: [
 					{
 						name: "declarations.informationCorrect",
@@ -1022,8 +1071,7 @@ export const formContent: Record<
 					},
 					{
 						name: "declarations.infoSharingAcknowledged",
-						label:
-							"Absa may share information with credit bureaus and regulators.",
+						label: "Absa may share information with credit bureaus and regulators.",
 						type: "checkbox",
 						required: true,
 					},
@@ -1080,5 +1128,58 @@ export const formContent: Record<
 				],
 			},
 		],
+		testData: {
+			"applicantDetails.ultimateCreditorName": "Test Company (Pty) Ltd",
+			"applicantDetails.preferredShortName": "TESTCO",
+			"applicantDetails.alternativeShortNames.0": "TEST",
+			"applicantDetails.alternativeShortNames.1": "TCO",
+			"applicantDetails.alternativeShortNames.2": "TC",
+			"applicantDetails.natureOfBusiness": "Software Development",
+			"applicantDetails.companyRegistrationNumber": "2024/123456/07",
+			"applicantDetails.applicationTypes": ["EFT", "DebiCheck"],
+			"applicantDetails.directors": [
+				{ fullName: "John Doe", idNumber: "8001015009087" },
+				{ fullName: "Jane Smith", idNumber: "8505050050080" },
+				{ fullName: "Bob Jones", idNumber: "9009095009081" },
+			],
+			"applicantDetails.physicalAddress.address": "123 Test Street",
+			"applicantDetails.physicalAddress.suburb": "Testville",
+			"applicantDetails.physicalAddress.city": "Test City",
+			"applicantDetails.physicalAddress.postalCode": "1234",
+			"applicantDetails.registeredAddress.address": "456 Reg Road",
+			"applicantDetails.registeredAddress.suburb": "Regville",
+			"applicantDetails.registeredAddress.city": "Reg City",
+			"applicantDetails.registeredAddress.postalCode": "5678",
+			"applicantDetails.contactInfo.telephone": "0111234567",
+			"applicantDetails.contactInfo.email": "test@example.com",
+			"applicantDetails.contactInfo.website": "https://example.com",
+			"applicantDetails.bankingDetails.bankName": "Test Bank",
+			"applicantDetails.bankingDetails.accountType": "Current",
+			"applicantDetails.bankingDetails.branchCode": "123456",
+			"applicantDetails.bankingDetails.accountNumber": "123456789",
+			"applicantDetails.bankingDetails.sourceOfIncome": "Sales",
+			"applicantDetails.salesDistribution": ["Direct Sales"],
+			"applicantDetails.collectionHistory.isNewToCollections": "yes",
+			"applicantDetails.collectionHistory.previousCollections": "no",
+			"previousHistory.wasExited": "no",
+			references: [
+				{ name: "Ref 1", accountNumber: "111", reference: "Good" },
+				{ name: "Ref 2", accountNumber: "222", reference: "Good" },
+				{ name: "Ref 3", accountNumber: "333", reference: "Good" },
+				{ name: "Ref 4", accountNumber: "444", reference: "Good" },
+				{ name: "Ref 5", accountNumber: "555", reference: "Good" },
+			],
+			"businessMetrics.averageDisputeRatio": "1.5",
+			"businessMetrics.averageUnpaidRatio": "2.0",
+			"businessMetrics.salesEmployeesCount": "10",
+			"businessMetrics.averageDebitOrderValue": "500",
+			"businessMetrics.presentBookSize": "1000",
+			"businessMetrics.businessOperationLength": "5 years",
+			"businessMetrics.sponsoredByAnotherBank": "no",
+			"businessMetrics.litigationPending": "no",
+			"businessMetrics.directorsUnderAdministration": "no",
+			"businessMetrics.formalComplaints": "no",
+			"businessMetrics.complianceConcerns": "no",
+		},
 	},
 };
