@@ -1,10 +1,16 @@
+import { eq } from "drizzle-orm";
 import FormShell from "@/components/forms/form-shell";
 import UploadView from "./upload-view";
-import { getAllDocumentRequirements } from "@/config/document-requirements";
+import {
+	getDocumentRequirements,
+	type DocumentRequirementContext,
+} from "@/config/document-requirements";
 import {
 	getFormInstanceByToken,
 	markFormInstanceStatus,
 } from "@/lib/services/form.service";
+import { getDatabaseClient } from "@/app/utils";
+import { applicants } from "@/db/schema";
 
 interface UploadPageProps {
 	params: Promise<{ token: string }>;
@@ -40,12 +46,34 @@ export default async function UploadPage({ params }: UploadPageProps) {
 		await markFormInstanceStatus(formInstance.id, "viewed");
 	}
 
-	const requirements = getAllDocumentRequirements();
+	// Look up the applicant to build conditional requirements context
+	const db = getDatabaseClient();
+	let context: DocumentRequirementContext = {};
+
+	if (db) {
+		const applicantResults = await db
+			.select()
+			.from(applicants)
+			.where(eq(applicants.id, formInstance.applicantId));
+
+		const applicant = applicantResults[0];
+
+		if (applicant) {
+			context = {
+				entityType: (applicant.entityType as DocumentRequirementContext["entityType"]) ?? undefined,
+				industry: applicant.industry ?? undefined,
+				productType: (applicant.productType as DocumentRequirementContext["productType"]) ?? undefined,
+				isHighRisk: applicant.riskLevel === "red",
+			};
+		}
+	}
+
+	const requirements = getDocumentRequirements(context);
 
 	return (
 		<FormShell
 			title="Document Uploads"
-			description="Upload supporting documents for StratCol onboarding.">
+			description="Upload the documents required for your StratCol onboarding. Only documents relevant to your application are shown below.">
 			<UploadView token={token} requirements={requirements} />
 		</FormShell>
 	);

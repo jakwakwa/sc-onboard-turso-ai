@@ -8,6 +8,8 @@ import { quotes } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import {
 	absa6995Schema,
+	accountantLetterSchema,
+	callCentreApplicationSchema,
 	facilityApplicationSchema,
 	signedQuotationSchema,
 	stratcolContractSchema,
@@ -29,6 +31,8 @@ const formSubmissionSchema = z.object({
 		"SIGNED_QUOTATION",
 		"STRATCOL_CONTRACT",
 		"ABSA_6995",
+		"ACCOUNTANT_LETTER",
+		"CALL_CENTRE_APPLICATION",
 	]),
 	data: z.record(z.string(), z.unknown()),
 });
@@ -39,16 +43,26 @@ const formSchemaMap: Record<FormType, z.ZodSchema> = {
 	STRATCOL_CONTRACT: stratcolContractSchema,
 	ABSA_6995: absa6995Schema,
 	DOCUMENT_UPLOADS: z.any(),
+	ACCOUNTANT_LETTER: accountantLetterSchema,
+	CALL_CENTRE_APPLICATION: callCentreApplicationSchema,
 };
 
 const extractSubmittedBy = (formType: FormType, data: Record<string, unknown>) => {
-	if (formType === "SIGNED_QUOTATION" || formType === "STRATCOL_CONTRACT") {
+	if (
+		formType === "SIGNED_QUOTATION" ||
+		formType === "STRATCOL_CONTRACT" ||
+		formType === "CALL_CENTRE_APPLICATION"
+	) {
 		return typeof data.signatureName === "string" ? data.signatureName : undefined;
 	}
 
 	if (formType === "ABSA_6995") {
 		const signatures = data.signatures as { clientName?: string } | undefined;
 		return signatures?.clientName;
+	}
+
+	if (formType === "ACCOUNTANT_LETTER") {
+		return typeof data.accountantName === "string" ? data.accountantName : undefined;
 	}
 
 	return undefined;
@@ -221,6 +235,30 @@ export async function POST(request: NextRequest) {
 					data: {
 						workflowId: formInstance.workflowId,
 						signedAt: new Date().toISOString(),
+					},
+				});
+			}
+
+			if (formType === "ACCOUNTANT_LETTER") {
+				await inngest.send({
+					name: "form/accountant-letter.submitted",
+					data: {
+						workflowId: formInstance.workflowId,
+						applicantId: formInstance.applicantId,
+						submissionId: submission.id,
+						submittedAt: new Date().toISOString(),
+					},
+				});
+			}
+
+			if (formType === "CALL_CENTRE_APPLICATION") {
+				await inngest.send({
+					name: "form/call-centre.submitted",
+					data: {
+						workflowId: formInstance.workflowId,
+						applicantId: formInstance.applicantId,
+						submissionId: submission.id,
+						submittedAt: new Date().toISOString(),
 					},
 				});
 			}

@@ -322,9 +322,8 @@ export async function sendProgressiveFormsEmail(params: {
 														link => `
                             <div style="margin: 12px 0; padding: 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0;">
                                 <a href="${link.url}" style="color: #0369a1; text-decoration: none; font-weight: 500;">
-                                    ${link.label}
+                                    ${link.formType.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")}
                                 </a>
-                                ${link.description ? `<p style="margin: 8px 0 0 0; color: #64748b; font-size: 14px;">${link.description}</p>` : ""}
                             </div>
                         `
 													)

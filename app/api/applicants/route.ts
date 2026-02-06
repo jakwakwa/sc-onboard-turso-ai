@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
 					email: data.email,
 					phone: data.phone,
 					industry: data.industry,
+					entityType: data.entityType,
+					productType: data.productType,
 					employeeCount: data.employeeCount,
 					mandateVolume: data.estimatedVolume
 						? parseInt(data.estimatedVolume.replace(/[^0-9]/g, ""))

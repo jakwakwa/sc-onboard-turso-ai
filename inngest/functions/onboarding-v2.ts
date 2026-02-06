@@ -195,19 +195,25 @@ type FicaUploadEvent = {
 
 const OVERLIMIT_THRESHOLD = 500_000_00; // R500,000 in cents
 
+// Real document type references matching official StratCol requirements
+// These are informational for workflow logging; the actual upload page uses
+// getDocumentRequirements(context) from config/document-requirements.ts
 const MANDATE_DOCUMENT_REQUIREMENTS: Record<string, string[]> = {
-	EFT: ["BANK_CONFIRMATION", "EFT_MANDATE_FORM"],
-	DEBIT_ORDER: ["DEBIT_ORDER_MANDATE", "BANK_STATEMENT_3M"],
-	CASH: ["PROOF_OF_REGISTRATION"],
-	MIXED: ["BANK_CONFIRMATION", "EFT_MANDATE_FORM", "DEBIT_ORDER_MANDATE"],
+	EFT: ["BANK_STATEMENT", "COMPANY_REGISTRATION", "TAX_VAT"],
+	DEBIT_ORDER: ["BANK_STATEMENT", "COMPANY_REGISTRATION", "TAX_VAT"],
+	CASH: ["BANK_STATEMENT", "COMPANY_REGISTRATION"],
+	MIXED: ["BANK_STATEMENT", "COMPANY_REGISTRATION", "TAX_VAT"],
 };
 
-// Business-type specific document requirements (simplified)
+// Business-type specific document requirements (matches official StratCol spec)
 const BUSINESS_TYPE_DOCUMENTS: Record<string, string[]> = {
-	NPO: ["NPO_REGISTRATION", "TAX_EXEMPTION_CERTIFICATE", "BOARD_RESOLUTION"],
-	PROPRIETOR: ["INDIVIDUAL_ID", "PROOF_OF_RESIDENCE"],
-	COMPANY: ["CIPC_REGISTRATION", "DIRECTOR_DETAILS", "COMPANY_RESOLUTION"],
-	TRUST: ["TRUST_DEED", "LETTERS_AUTHORITY", "TRUSTEE_DETAILS"],
+	npo: ["NPO_CONSTITUTION", "NPO_RESOLUTION", "NPO_BOARD_LIST"],
+	proprietor: ["DIRECTOR_ID", "PROOF_OF_RESIDENCE"],
+	company: ["COMPANY_REGISTRATION", "DIRECTOR_ID", "TAX_VAT"],
+	close_corporation: ["COMPANY_REGISTRATION", "DIRECTOR_ID", "TAX_VAT"],
+	trust: ["TRUST_LETTER_OF_AUTHORITY", "TRUST_BENEFICIARY_IDS"],
+	body_corporate: ["BODY_CORPORATE_RESOLUTION", "BODY_CORPORATE_BOARD_LIST"],
+	partnership: ["COMPANY_REGISTRATION", "DIRECTOR_ID", "TAX_VAT"],
 };
 
 // ============================================
@@ -228,19 +234,19 @@ async function checkOverlimit(quoteAmount: number): Promise<{
 
 function determineMandateRequirements(
 	mandateType: string,
-	businessType?: string
+	entityType?: string
 ): {
 	requiredDocuments: string[];
 	requiresProcurementCheck: boolean;
 } {
 	// Get mandate-specific documents
-	const mandateDocs = MANDATE_DOCUMENT_REQUIREMENTS[mandateType] || ["MANDATE_FORM"];
+	const mandateDocs = MANDATE_DOCUMENT_REQUIREMENTS[mandateType] || ["BANK_STATEMENT"];
 
-	// Get business-type specific documents (if provided)
-	const businessDocs = businessType ? BUSINESS_TYPE_DOCUMENTS[businessType] || [] : [];
+	// Get entity-type specific documents (uses lowercase keys matching DB values)
+	const entityDocs = entityType ? BUSINESS_TYPE_DOCUMENTS[entityType] || [] : [];
 
 	// Combine and deduplicate
-	const requiredDocuments = [...new Set([...mandateDocs, ...businessDocs])];
+	const requiredDocuments = [...new Set([...mandateDocs, ...entityDocs])];
 
 	// Procurement check required for EFT and MIXED mandates
 	const requiresProcurementCheck = mandateType === "EFT" || mandateType === "MIXED";
@@ -623,8 +629,20 @@ export const onboardingWorkflowV2 = inngest.createFunction(
 		// Step 3.1: Determine Mandate Type from Facility Application
 		const mandateInfo = await step.run("determine-mandate-type", async () => {
 			const { formData } = facilityFormEvent.data;
+
+			// Fetch the applicant's entityType from DB for accurate document requirements
+			const db = getDatabaseClient();
+			let applicantEntityType: string | undefined;
+			if (db) {
+				const applicantResults = await db
+					.select()
+					.from(applicants)
+					.where(eq(applicants.id, applicantId));
+				applicantEntityType = applicantResults[0]?.entityType ?? undefined;
+			}
+
 			const { requiredDocuments, requiresProcurementCheck } =
-				determineMandateRequirements(formData.mandateType, formData.businessType);
+				determineMandateRequirements(formData.mandateType, applicantEntityType);
 
 			await logWorkflowEvent({
 				workflowId,
@@ -638,9 +656,9 @@ export const onboardingWorkflowV2 = inngest.createFunction(
 			});
 
 			// Update applicant with mandate info
-			const db = getDatabaseClient();
-			if (db) {
-				await db
+			const mandateDb = getDatabaseClient();
+			if (mandateDb) {
+				await mandateDb
 					.update(applicants)
 					.set({
 						mandateType: formData.mandateType,
@@ -691,7 +709,7 @@ export const onboardingWorkflowV2 = inngest.createFunction(
 				})
 			: Promise.resolve(null);
 
-		// Branch B: Request Mandate Documents
+		// Branch B: Request Mandate Documents (with conditional links)
 		const mandateDocsPromise = step.run("request-mandate-documents", async () => {
 			const db = getDatabaseClient();
 			if (!db) throw new Error("Database connection failed");
@@ -706,32 +724,62 @@ export const onboardingWorkflowV2 = inngest.createFunction(
 				throw new Error(`Applicant ${applicantId} not found`);
 			}
 
-			// Create document upload link
-			const { token } = await createFormInstance({
+			const baseUrl = getBaseUrl();
+			const links: Array<{ formType: string; url: string }> = [];
+
+			// 1. Always create the document upload link (shows conditional docs based on applicant context)
+			const { token: uploadToken } = await createFormInstance({
 				applicantId,
 				workflowId,
 				formType: "DOCUMENT_UPLOADS" as FormType,
 			});
+			links.push({ formType: "DOCUMENT_UPLOADS", url: `${baseUrl}/uploads/${uploadToken}` });
 
-			const baseUrl = getBaseUrl();
-			const uploadLink = `${baseUrl}/uploads/${token}`;
+			// 2. Accountant Letter form — sent to all applicants
+			const { token: accountantToken } = await createFormInstance({
+				applicantId,
+				workflowId,
+				formType: "ACCOUNTANT_LETTER" as FormType,
+			});
+			links.push({
+				formType: "ACCOUNTANT_LETTER",
+				url: `${baseUrl}/forms/${accountantToken}`,
+			});
+
+			// 3. Call Centre Application — only for call_centre product type
+			if (applicant.productType === "call_centre") {
+				const { token: callCentreToken } = await createFormInstance({
+					applicantId,
+					workflowId,
+					formType: "CALL_CENTRE_APPLICATION" as FormType,
+				});
+				links.push({
+					formType: "CALL_CENTRE_APPLICATION",
+					url: `${baseUrl}/forms/${callCentreToken}`,
+				});
+			}
 
 			await sendApplicantFormLinksEmail({
 				email: applicant.email,
 				contactName: applicant.contactName,
-				links: [{ formType: "DOCUMENT_UPLOADS", url: uploadLink }],
+				links,
 			});
 
+			const linksSummary = links.map(l => l.formType).join(", ");
 			await createWorkflowNotification({
 				workflowId,
 				applicantId,
 				type: "awaiting",
-				title: "Mandate Documents Required",
-				message: `Please upload the following documents: ${mandateInfo.requiredDocuments.join(", ")}`,
+				title: "Documents & Forms Required",
+				message: `Sent the following links to applicant: ${linksSummary}. Required docs: ${mandateInfo.requiredDocuments.join(", ")}`,
 				actionable: true,
 			});
 
-			return { requestSent: true, requiredDocuments: mandateInfo.requiredDocuments };
+			return {
+				requestSent: true,
+				requiredDocuments: mandateInfo.requiredDocuments,
+				linksSent: links.map(l => l.formType),
+			};
 		});
 
 		// Execute both branches
@@ -1006,6 +1054,79 @@ export const onboardingWorkflowV2 = inngest.createFunction(
 				reason: finalRiskDecision.reason,
 				decidedBy: finalRiskDecision.decidedBy,
 			};
+		}
+
+		// ================================================================
+		// STAGE 4.5: High-Risk Financial Statements Confirmation
+		// For high-risk applicants, the risk manager must confirm they have
+		// personally sent and received financial statements before proceeding.
+		// ================================================================
+
+		const isHighRisk = await step.run("check-high-risk-status", async () => {
+			const db = getDatabaseClient();
+			if (!db) return false;
+			const results = await db
+				.select()
+				.from(applicants)
+				.where(eq(applicants.id, applicantId));
+			return results[0]?.riskLevel === "red";
+		});
+
+		if (isHighRisk) {
+			await step.run("notify-risk-manager-financial-statements", async () => {
+				await createWorkflowNotification({
+					workflowId,
+					applicantId,
+					type: "awaiting",
+					title: "Financial Statements Required (High-Risk)",
+					message:
+						"This is a high-risk applicant. The risk manager must personally send and confirm receipt of financial statements before the workflow can proceed.",
+					actionable: true,
+				});
+
+				await sendInternalAlertEmail({
+					title: "Financial Statements Required — High-Risk Applicant",
+					message:
+						"Please send financial statement request to this applicant and confirm once sent and received. The workflow is paused until you confirm.",
+					workflowId,
+					applicantId,
+					type: "warning",
+					actionUrl: `${getBaseUrl()}/dashboard/applicants/${applicantId}`,
+				});
+			});
+
+			const financialStatementsConfirmed = await step.waitForEvent(
+				"wait-for-financial-statements-confirmation",
+				{
+					event: "risk/financial-statements.confirmed",
+					timeout: "14d",
+					match: "data.workflowId",
+				}
+			);
+
+			if (!financialStatementsConfirmed) {
+				await step.run("financial-statements-timeout", () =>
+					updateWorkflowStatus(workflowId, "timeout", 4)
+				);
+
+				return {
+					status: "timeout",
+					stage: 4,
+					reason: "Financial statements confirmation timeout (high-risk applicant)",
+				};
+			}
+
+			await step.run("financial-statements-confirmed-log", () =>
+				logWorkflowEvent({
+					workflowId,
+					eventType: "stage_change",
+					payload: {
+						step: "financial-statements-confirmed",
+						confirmedBy: financialStatementsConfirmed.data.confirmedBy,
+						confirmedAt: financialStatementsConfirmed.data.confirmedAt,
+					},
+				})
+			);
 		}
 
 		// ================================================================

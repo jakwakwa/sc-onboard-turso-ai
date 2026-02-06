@@ -20,6 +20,10 @@ export const applicants = sqliteTable("applicants", {
 	phone: text("phone"), // contact_phone
 	industry: text("industry"),
 
+	// Entity & Product Classification
+	entityType: text("entity_type"), // company, close_corporation, proprietor, partnership, npo, trust, body_corporate, other
+	productType: text("product_type"), // standard, premium_collections, call_centre
+
 	// Mandate Info
 	mandateType: text("mandate_type"), // debit_order, eft_collection, etc.
 	mandateVolume: integer("mandate_volume"), // Renamed from estimatedVolume (was text), now integer cents or rand value? User used integer.

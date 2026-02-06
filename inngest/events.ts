@@ -387,6 +387,41 @@ export type Events = {
 	};
 
 	// ============================================
+	// Accountant Letter & Call Centre Events
+	// ============================================
+
+	/** Accountant letter form submitted */
+	"form/accountant-letter.submitted": {
+		data: {
+			workflowId: number;
+			applicantId: number;
+			submissionId: number;
+			submittedAt: string;
+		};
+	};
+
+	/** Call centre application form submitted */
+	"form/call-centre.submitted": {
+		data: {
+			workflowId: number;
+			applicantId: number;
+			submissionId: number;
+			submittedAt: string;
+		};
+	};
+
+	/** Risk manager confirmed financial statements sent & received (high-risk only) */
+	"risk/financial-statements.confirmed": {
+		data: {
+			workflowId: number;
+			applicantId: number;
+			confirmedBy: string;
+			confirmedAt: string;
+			notes?: string;
+		};
+	};
+
+	// ============================================
 	// Form Submission Events
 	// ============================================
 

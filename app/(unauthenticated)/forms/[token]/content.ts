@@ -3,6 +3,8 @@ import type { FormType } from "@/lib/types";
 import type { ZodTypeAny } from "zod";
 import {
 	absa6995Schema,
+	accountantLetterSchema,
+	callCentreApplicationSchema,
 	facilityApplicationSchema,
 	signedQuotationSchema,
 	stratcolContractSchema,
@@ -1180,6 +1182,200 @@ export const formContent: Record<
 			"businessMetrics.directorsUnderAdministration": "no",
 			"businessMetrics.formalComplaints": "no",
 			"businessMetrics.complianceConcerns": "no",
+		},
+	},
+	ACCOUNTANT_LETTER: {
+		title: "Confirmation of Accounting Officer Letter",
+		description:
+			"This pro forma letter must be completed by the applicant's accountant or auditor to confirm the business address and legitimacy. Please have your accountant/auditor complete and sign this form on their letterhead.",
+		schema: accountantLetterSchema,
+		submitLabel: "Submit accountant letter",
+		defaultValues: {
+			confirmLegitimate: false,
+		},
+		sections: [
+			{
+				title: "Pro Forma Letter",
+				description:
+					"To: The Directors, StratCol Ltd — Attention: Marketing Director. I hereby confirm that I am the Accountant/Auditor of the below-named business, which is in the process of concluding an agreement with StratCol as User of their services. I confirm the following is within my own personal knowledge.",
+				fields: [
+					{
+						name: "businessName",
+						label: "Name of business / company",
+						type: "text",
+						required: true,
+						colSpan: 2,
+					},
+					{
+						name: "physicalAddress",
+						label: "Full physical address of applicant (the User trades from this address)",
+						type: "textarea",
+						required: true,
+						colSpan: 2,
+					},
+					{
+						name: "confirmLegitimate",
+						label:
+							"I confirm the User's business is legitimate and I am not aware of any investigation into the affairs of the User by any authority.",
+						type: "checkbox",
+						required: true,
+						colSpan: 2,
+					},
+				],
+			},
+			{
+				title: "Accountant / Auditor Details & Signature",
+				description: "Provide your professional details and sign the letter.",
+				fields: [
+					{
+						name: "accountantName",
+						label: "Accountant / Auditor name",
+						type: "text",
+						required: true,
+					},
+					{
+						name: "practiceNumber",
+						label: "Practice number",
+						type: "text",
+						required: true,
+					},
+					{
+						name: "signatureName",
+						label: "Typed signature",
+						type: "signature",
+						required: true,
+					},
+					{
+						name: "signatureDate",
+						label: "Signature date",
+						type: "date",
+						required: true,
+					},
+				],
+			},
+		],
+		testData: {
+			businessName: "Test Company (Pty) Ltd",
+			physicalAddress: "123 Business Street, Sandton, 2196",
+			confirmLegitimate: true,
+			accountantName: "J. Smith CA(SA)",
+			practiceNumber: "PR-12345",
+			signatureName: "J. Smith",
+			signatureDate: new Date().toISOString().split("T")[0],
+		},
+	},
+	CALL_CENTRE_APPLICATION: {
+		title: "Call Centre Application",
+		description:
+			"This form is required for all call centre applicants. Please provide the service agreement acceptance, product description, supplier contact information, and call script.",
+		schema: callCentreApplicationSchema,
+		submitLabel: "Submit call centre application",
+		defaultValues: {
+			serviceAgreementAccepted: false,
+		},
+		sections: [
+			{
+				title: "Service Agreement",
+				description:
+					"Review and accept the StratCol service agreement for call centre operations.",
+				fields: [
+					{
+						name: "serviceAgreementAccepted",
+						label:
+							"I accept the StratCol service agreement terms for call centre operations.",
+						type: "checkbox",
+						required: true,
+						colSpan: 2,
+					},
+				],
+			},
+			{
+				title: "Product Description",
+				description: "Describe the products or services you will be collecting for.",
+				fields: [
+					{
+						name: "productDescription",
+						label: "Product / service description",
+						type: "textarea",
+						required: true,
+						colSpan: 2,
+					},
+				],
+			},
+			{
+				title: "Supplier Contact Information",
+				description: "Provide your supplier contact details.",
+				fields: [
+					{
+						name: "supplierName",
+						label: "Supplier name",
+						type: "text",
+						required: true,
+					},
+					{
+						name: "supplierPhone",
+						label: "Supplier phone",
+						type: "tel",
+						required: true,
+					},
+					{
+						name: "supplierEmail",
+						label: "Supplier email",
+						type: "email",
+						required: true,
+					},
+					{
+						name: "supplierAddress",
+						label: "Supplier address",
+						type: "text",
+						required: true,
+					},
+				],
+			},
+			{
+				title: "Call Script",
+				description:
+					"Provide the call script that will be used by your call centre agents.",
+				fields: [
+					{
+						name: "callScript",
+						label: "Call script",
+						type: "textarea",
+						required: true,
+						colSpan: 2,
+					},
+				],
+			},
+			{
+				title: "Signature",
+				description: "Confirm the information provided is accurate.",
+				fields: [
+					{
+						name: "signatureName",
+						label: "Typed signature",
+						type: "signature",
+						required: true,
+					},
+					{
+						name: "signatureDate",
+						label: "Signature date",
+						type: "date",
+						required: true,
+					},
+				],
+			},
+		],
+		testData: {
+			serviceAgreementAccepted: true,
+			productDescription: "Monthly insurance premium collections via call centre",
+			supplierName: "Test Supplier (Pty) Ltd",
+			supplierPhone: "011 123 4567",
+			supplierEmail: "supplier@test.co.za",
+			supplierAddress: "456 Supplier Road, Johannesburg, 2000",
+			callScript:
+				"Good day, this is [Agent Name] calling from [Company]. I am calling regarding your monthly premium payment...",
+			signatureName: "John Smith",
+			signatureDate: new Date().toISOString().split("T")[0],
 		},
 	},
 };

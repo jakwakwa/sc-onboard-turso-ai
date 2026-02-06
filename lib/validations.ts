@@ -14,12 +14,31 @@ export const applicantStatusEnum = z.enum([
 	"lost",
 ]);
 
+export const entityTypeEnum = z.enum([
+	"company",
+	"close_corporation",
+	"proprietor",
+	"partnership",
+	"npo",
+	"trust",
+	"body_corporate",
+	"other",
+]);
+
+export const productTypeEnum = z.enum([
+	"standard",
+	"premium_collections",
+	"call_centre",
+]);
+
 export const createApplicantSchema = z.object({
 	companyName: z.string().min(2, "Company name must be at least 2 characters"),
 	contactName: z.string().min(2, "Contact name must be at least 2 characters"),
 	email: z.string().email("Invalid email address"),
 	phone: z.string().optional(),
 	industry: z.string().optional(),
+	entityType: entityTypeEnum,
+	productType: productTypeEnum,
 	employeeCount: z.number().int().positive().optional(),
 	estimatedVolume: z.string().optional(),
 	notes: z.string().optional(),
