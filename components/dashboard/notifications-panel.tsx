@@ -15,7 +15,6 @@ import {
 	RiUserLine,
 } from "@remixicon/react";
 import Link from "next/link";
-import router from "next/router";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -256,7 +255,7 @@ export function NotificationsPanel({
 										<div className="flex items-center justify-between mt-2">
 											<span className="text-[10px] text-muted-foreground/70 flex items-center gap-1">
 												<RiTimeLine className="h-3 w-3" />
-												{formatRelativeTime(notification?.timestamp)}
+												{formatRelativeTime(new Date(notification?.timestamp))}
 											</span>
 
 											{/* Actionable Buttons */}
@@ -265,15 +264,13 @@ export function NotificationsPanel({
 													{/* Approval Actions */}
 													{(notification?.type === "awaiting" ||
 														notification?.type === "warning") && (
-														<>
-															<Button
-																variant="ghost"
-																size="sm"
-																className="h-6 px-2 text-xs hover:bg-teal-500/40 hover:text-emerald-600/80"
-																onClick={e => handleAction(e, notification, "view")}>
-																View
-															</Button>
-														</>
+														<Button
+															variant="ghost"
+															size="sm"
+															className="h-6 px-2 text-xs hover:bg-teal-500/40 hover:text-emerald-600/80"
+															onClick={e => handleAction(e, notification, "view")}>
+															View
+														</Button>
 													)}
 													{/* Error/Timeout Actions */}
 													{(notification?.type === "error" ||
